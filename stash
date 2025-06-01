@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#
+# stash - a utility to temporarily store and restore files and directories
+# similar concept to git stash but for general files and directories
+#
+# usage: stash <command> [options]
+# see 'stash help' for more information
+#
+# version: 1.2
+
+# fail on errors, undefined variables, and pipe failures
+set -euo pipefail
+
+# get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# determine library directory (development vs installed)
+if [[ -d "${SCRIPT_DIR}/lib" ]]; then
+    LIB_DIR="${SCRIPT_DIR}/lib"
+elif [[ -d "${SCRIPT_DIR}/bash-stash.d" ]]; then
+    LIB_DIR="${SCRIPT_DIR}/bash-stash.d"
+else
+    echo "error: unable to find library directory" >&2
+    exit 1
+fi
+
+# source all library files
+source "${LIB_DIR}/config.sh"
+source "${LIB_DIR}/logging.sh"
+source "${LIB_DIR}/locking.sh"
+source "${LIB_DIR}/utils.sh"
+source "${LIB_DIR}/stash_ops.sh"
+source "${LIB_DIR}/commands.sh"
+source "${LIB_DIR}/help.sh"
+
+# set up signal traps
+setup_traps
+
+# main script logic
+case "${1:-}" in
+    save)
+        shift
+        save_stash "$@"
+        ;;
+    list)
+        list_stash
+        ;;
+    show)
+        show_stash "${2:-}"
+        ;;
+    apply)
+        apply_stash "${2:-}"
+        ;;
+    drop)
+        drop_stash "${2:-}"
+        ;;
+    clear)
+        clear_stashes
+        ;;
+    help|--help|-h)
+        usage
+        ;;
+    version|--version|-v)
+        echo "$SCRIPT_NAME version $VERSION"
+        ;;
+    *)
+        if [[ -z "${1:-}" ]]; then
+            error "no command specified."
+        else
+            error "unknown command '$1'"
+        fi
+        usage
+        exit 1
+        ;;
+esac
+
+exit 0 
