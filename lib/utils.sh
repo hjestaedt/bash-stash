@@ -5,19 +5,21 @@ safe_realpath() {
     local path="$1"
     local resolved
     
+    # check if path exists first
+    if [[ ! -e "$path" ]]; then
+        error "path does not exist: $path"
+        return 1
+    fi
+    
     # try using realpath if available
     if command -v realpath >/dev/null 2>&1; then
-        resolved=$(realpath -e "$path" 2>/dev/null) || {
-            error "path does not exist: $path"
+        # try with -e flag first (Linux), fall back to no flags (macOS)
+        resolved=$(realpath -e "$path" 2>/dev/null) || resolved=$(realpath "$path" 2>/dev/null) || {
+            error "failed to resolve path: $path"
             return 1
         }
     else
         # fallback for systems without realpath
-        if [[ ! -e "$path" ]]; then
-            error "path does not exist: $path"
-            return 1
-        fi
-        
         # handle absolute paths
         if [[ "${path:0:1}" = "/" ]]; then
             resolved="$path"

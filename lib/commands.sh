@@ -193,7 +193,9 @@ save_stash() {
 list_stash() {
     local sorted_stashes=()
     
-    mapfile -t sorted_stashes < <(get_sorted_stashes)
+    while IFS= read -r line; do
+        sorted_stashes+=("$line")
+    done < <(get_sorted_stashes)
     
     if [[ ${#sorted_stashes[@]} -eq 0 ]]; then
         info "no stashes found."
@@ -317,14 +319,42 @@ show_stash() {
 
 # apply/restore a stash
 apply_stash() {
-    if [[ -z "${1:-}" ]]; then
+    local force_overwrite=0
+    local stash_id=""
+    
+    # parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            -f|--force)
+                force_overwrite=1
+                shift
+                ;;
+            -*)
+                error "unknown option: $1"
+                echo "usage: stash apply <stash-id> [-f|--force]"
+                return 1
+                ;;
+            *)
+                if [[ -z "$stash_id" ]]; then
+                    stash_id="$1"
+                else
+                    error "multiple stash ids specified."
+                    echo "usage: stash apply <stash-id> [-f|--force]"
+                    return 1
+                fi
+                shift
+                ;;
+        esac
+    done
+    
+    if [[ -z "$stash_id" ]]; then
         error "no stash id specified."
-        echo "usage: stash apply <stash-id>"
+        echo "usage: stash apply <stash-id> [-f|--force]"
         return 1
     fi
     
     local resolved_id
-    resolved_id=$(resolve_stash_id "$1") || return 1
+    resolved_id=$(resolve_stash_id "$stash_id") || return 1
     
     local stash_path="${STASH_DIR}/$resolved_id"
     
@@ -357,8 +387,13 @@ apply_stash() {
         fi
         
         if [[ -e "$original_path" ]]; then
-            warn "'$original_path' already exists. skipping restoration."
-            continue
+            if [[ $force_overwrite -eq 1 ]]; then
+                warn "overwriting existing file/directory: $original_path"
+                rm -rf "$original_path"
+            else
+                warn "'$original_path' already exists. skipping restoration."
+                continue
+            fi
         fi
         
         if [[ $compressed -eq 1 ]]; then
@@ -441,7 +476,10 @@ drop_stash() {
 clear_stashes() {
     local sorted_stashes=()
     
-    mapfile -t sorted_stashes < <(get_sorted_stashes)
+    # compatible with bash 3.2
+    while IFS= read -r line; do
+        sorted_stashes+=("$line")
+    done < <(get_sorted_stashes)
     
     if [[ ${#sorted_stashes[@]} -eq 0 ]]; then
         info "no stashes found."

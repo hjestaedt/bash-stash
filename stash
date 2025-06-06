@@ -49,7 +49,8 @@ case "${1:-}" in
         show_stash "${2:-}"
         ;;
     apply)
-        apply_stash "${2:-}"
+        shift
+        apply_stash "$@"
         ;;
     drop)
         drop_stash "${2:-}"

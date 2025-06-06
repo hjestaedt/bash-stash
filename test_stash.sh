@@ -400,6 +400,127 @@ test_stash_apply_and_drop() {
     return 0
 }
 
+# test applying a stash when file already exists (should skip)
+test_stash_apply_existing_file() {
+    local file_path="${TEST_DIR}/files/file1.txt"
+    local original_content="Test file 1 content"
+    local new_content="Modified content"
+    
+    # stash the original file
+    assert_file_exists "$file_path" || return 1
+    $STASH_CMD save "$file_path" -m "test apply with existing file" > /dev/null || return 1
+    assert_not_exists "$file_path" || return 1
+    
+    # create a new file with different content at the same location
+    echo "$new_content" > "$file_path"
+    
+    # apply stash without -f flag (should skip)
+    echo "n" | $STASH_CMD apply 1 > /dev/null 2>&1 || return 1
+    
+    # verify the new file content is preserved (not overwritten)
+    assert_file_contains "$file_path" "$new_content" || return 1
+    
+    return 0
+}
+
+# test applying a stash with -f flag to force overwrite
+test_stash_apply_force_overwrite() {
+    local file_path="${TEST_DIR}/files/file1.txt"
+    local original_content="Test file 1 content"
+    local new_content="Modified content"
+    
+    # stash the original file
+    assert_file_exists "$file_path" || return 1
+    $STASH_CMD save "$file_path" -m "test force apply" > /dev/null || return 1
+    assert_not_exists "$file_path" || return 1
+    
+    # create a new file with different content at the same location
+    echo "$new_content" > "$file_path"
+    assert_file_contains "$file_path" "$new_content" || return 1
+    
+    # apply stash with -f flag (should overwrite)
+    echo "n" | $STASH_CMD apply 1 -f > /dev/null 2>&1 || return 1
+    
+    # verify the original content is restored (file was overwritten)
+    assert_file_contains "$file_path" "$original_content" || return 1
+    
+    return 0
+}
+
+# test applying a stash with --force flag (long form)
+test_stash_apply_force_long_flag() {
+    local file_path="${TEST_DIR}/files/file1.txt"
+    local original_content="Test file 1 content"
+    local new_content="Modified content"
+    
+    # stash the original file
+    assert_file_exists "$file_path" || return 1
+    $STASH_CMD save "$file_path" -m "test force apply long flag" > /dev/null || return 1
+    assert_not_exists "$file_path" || return 1
+    
+    # create a new file with different content at the same location
+    echo "$new_content" > "$file_path"
+    
+    # apply stash with --force flag
+    echo "n" | $STASH_CMD apply 1 --force > /dev/null 2>&1 || return 1
+    
+    # verify the original content is restored
+    assert_file_contains "$file_path" "$original_content" || return 1
+    
+    return 0
+}
+
+# test applying with -f flag where stash id comes after flag
+test_stash_apply_force_flag_order() {
+    local file_path="${TEST_DIR}/files/file1.txt"
+    local original_content="Test file 1 content"
+    local new_content="Modified content"
+    
+    # stash the original file
+    assert_file_exists "$file_path" || return 1
+    $STASH_CMD save "$file_path" -m "test flag order" > /dev/null || return 1
+    assert_not_exists "$file_path" || return 1
+    
+    # create a new file with different content
+    echo "$new_content" > "$file_path"
+    
+    # apply stash with -f flag before stash id
+    echo "n" | $STASH_CMD apply -f 1 > /dev/null 2>&1 || return 1
+    
+    # verify the original content is restored
+    assert_file_contains "$file_path" "$original_content" || return 1
+    
+    return 0
+}
+
+# test error case - unknown option for apply command
+test_apply_unknown_option() {
+    local file_path="${TEST_DIR}/files/file1.txt"
+    
+    $STASH_CMD save "$file_path" -m "test unknown option" > /dev/null || return 1
+    
+    if $STASH_CMD apply 1 --unknown-flag > /dev/null 2>&1; then
+        echo "expected failure with unknown flag, but command succeeded"
+        return 1
+    fi
+    
+    return 0
+}
+
+# test error case - multiple stash ids
+test_apply_multiple_stash_ids() {
+    local file_path="${TEST_DIR}/files/file1.txt"
+    
+    $STASH_CMD save "$file_path" -m "test multiple ids" > /dev/null || return 1
+    
+    if $STASH_CMD apply 1 2 > /dev/null 2>&1; then
+        echo "expected failure with multiple stash ids, but command succeeded"
+        return 1
+    fi
+    
+    return 0
+}
+
 # test dropping a stash
 test_stash_drop() {
     local file_path="${TEST_DIR}/files/file1.txt"
@@ -470,13 +591,18 @@ test_stash_nonexistent() {
 
 # test error cases - stashing current directory
 test_stash_current_dir() {
+    local original_pwd="$PWD"
     cd "${TEST_DIR}/files"
+    
+    local result=0
     if $STASH_CMD save . > /dev/null 2>&1; then
         echo "expected failure when stashing current directory, but command succeeded"
-        return 1
+        result=1
     fi
     
-    return 0
+    # always return to original directory
+    cd "$original_pwd"
+    return $result
 }
 
 # test error cases - apply non-existent stash
@@ -524,6 +650,10 @@ run_tests() {
     run_test "show stash details" test_stash_show
     run_test "apply a stash" test_stash_apply
     run_test "apply and drop a stash" test_stash_apply_and_drop
+    run_test "apply with existing file (should skip)" test_stash_apply_existing_file
+    run_test "apply with force overwrite (-f)" test_stash_apply_force_overwrite
+    run_test "apply with force overwrite (--force)" test_stash_apply_force_long_flag
+    run_test "apply with -f flag before stash id" test_stash_apply_force_flag_order
     run_test "drop a stash" test_stash_drop
     run_test "clear all stashes" test_stash_clear
     
@@ -531,6 +661,8 @@ run_tests() {
     run_test "error: stash non-existent file" test_stash_nonexistent
     run_test "error: stash current directory" test_stash_current_dir
     run_test "error: apply non-existent stash" test_apply_nonexistent
+    run_test "error: apply with unknown option" test_apply_unknown_option
+    run_test "error: apply with multiple stash ids" test_apply_multiple_stash_ids
     run_test "error: drop non-existent stash" test_drop_nonexistent
     run_test "error: show non-existent stash" test_show_nonexistent
     

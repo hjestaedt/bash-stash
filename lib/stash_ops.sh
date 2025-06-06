@@ -41,8 +41,10 @@ resolve_stash_id() {
     if [[ "$input" =~ ^[0-9]+$ ]]; then
         local sorted_stashes=()
         
-        # get sorted stashes - more atomically
-        mapfile -t sorted_stashes < <(get_sorted_stashes)
+        # get sorted stashes - compatible with bash 3.2
+        while IFS= read -r line; do
+            sorted_stashes+=("$line")
+        done < <(get_sorted_stashes)
         
         # check if we have any stashes at all
         if [[ "${#sorted_stashes[@]}" -eq 0 ]]; then

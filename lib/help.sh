@@ -9,7 +9,7 @@ commands:
   save <file1> [file2...] [-m "message"]  - stash files/directories with optional message
   list                                   - list all stashed items
   show <stash-id>                        - show contents of a specific stash
-  apply <stash-id>                       - restore a stashed item to its original location
+  apply <stash-id> [-f]                  - restore a stashed item to its original location
   drop <stash-id>                        - remove a specific stash
   clear                                  - remove all stashes
   help                                   - display this help message
@@ -19,6 +19,7 @@ options:
   -m, --message "message"                - add a description when saving a stash
   -c, --copy                             - copy files instead of moving them (for save command)
   -z, --compress                         - compress the stashed content (for save command)
+  -f, --force                            - overwrite existing files when applying a stash
   -v, --verbose                          - show verbose output
   -d, --debug                            - enable debug output (very verbose)
 
@@ -28,6 +29,7 @@ examples:
   $SCRIPT_NAME list
   $SCRIPT_NAME show 1         # show stash by number
   $SCRIPT_NAME apply stash-20250315-123456  # apply by id
+  $SCRIPT_NAME apply 1 -f     # apply stash 1 and overwrite existing files
   $SCRIPT_NAME drop 2         # drop stash by number
   $SCRIPT_NAME clear
 
@@ -35,6 +37,7 @@ notes:
   - stash ids can be referenced by number (1, 2, 3) or full id (stash-YYYYMMDD-HHMMSS)
   - the current directory ('.') cannot be stashed directly
   - by default, files are moved to the stash. use --copy to keep originals.
+  - when applying a stash, existing files are skipped unless -f flag is used.
 EOF
     return 0
 } 
